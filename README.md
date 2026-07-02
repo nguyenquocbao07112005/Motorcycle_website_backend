@@ -98,4 +98,10 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
 
 ## Migrate DB
-npx prisma migrate dev --name init_motorcycle_db --schema=D:\MotorcycleApplication\motorcycle-application_backend\src\prisma\schema.prisma 
+npx prisma migrate dev --name init_motorcycle_db 
+
+## Run Script
+node src/scripts/scrape-honda.js
+
+## Prisma generate
+npx prisma generate
