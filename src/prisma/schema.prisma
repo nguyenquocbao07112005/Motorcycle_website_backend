@@ -1,0 +1,225 @@
+// CONFIGURATION
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ENUMS 
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum OrderStatus {
+  PENDING       // Chờ xử lý
+  PROCESSING    // Đang xử lý
+  SHIPPED       // Đang giao
+  DELIVERED     // Đã giao xe
+  CANCELLED     // Đã hủy
+}
+
+enum PaymentStatus {
+  PENDING       // Chờ thanh toán
+  COMPLETED     // Đã cọc/Đã thanh toán
+  FAILED        // Thất bại
+}
+
+enum TestDriveStatus {
+  PENDING       // Chờ xác nhận
+  CONFIRMED     // Đã xác nhận
+  COMPLETED     // Đã hoàn thành
+  CANCELLED     // Đã hủy
+}
+
+enum SenderType {
+  USER          // Tin nhắn của User
+  AI            // Phản hồi của A.I
+}
+
+
+// DOMAIN: USER
+model User {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  fullName      String
+  phone         String?
+  role          Role          @default(CUSTOMER) 
+  
+  // Relations
+  addresses     UserAddress[] 
+  orders        Order[]
+  testDrives    TestDrive[]
+  chatSessions  ChatSession[]
+
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model UserAddress {
+  id          String   @id @default(uuid())
+  userId      String
+  // Tự động xóa địa chỉ nếu tài khoản User bị xóa hoàn toàn
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  street      String
+  city        String
+  isDefault   Boolean  @default(false)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// DOMAIN: MOTORCYCLE 
+model Brand { 
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  motorcycles Motorcycle[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Category { 
+  id          String       @id @default(uuid())
+  name        String       @unique
+  description String?
+  motorcycles Motorcycle[]
+  
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Motorcycle {
+  id            String             @id @default(uuid())
+  name          String             @unique
+  engineCc      Int                
+  price         Decimal            @db.Decimal(15, 2)
+  stockQuantity Int                @default(0)
+  
+  // Foreign Keys
+  brandId       String
+  brand         Brand              @relation(fields: [brandId], references: [id])
+  categoryId    String
+  category      Category           @relation(fields: [categoryId], references: [id])
+
+  // Relations
+  specs         MotorcycleSpecs?   
+  images        MotorcycleImage[]  
+  orderItems    OrderItem[]
+  testDrives    TestDrive[]
+
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+}
+
+model MotorcycleSpecs { 
+  id              String     @id @default(uuid())
+  motorcycleId    String     @unique
+  // Xóa thông số chi tiết khi xe bị xóa khỏi danh mục
+  motorcycle      Motorcycle @relation(fields: [motorcycleId], references: [id], onDelete: Cascade)
+  
+  seatHeight      Float?     
+  weight          Float?     
+  fuelConsumption Float?     
+  maxPower        String?    
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+}
+
+model MotorcycleImage {
+  id           String     @id @default(uuid())
+  motorcycleId String
+  // Tự động xóa link ảnh trong DB nếu xóa xe tương ứng
+  motorcycle   Motorcycle @relation(fields: [motorcycleId], references: [id], onDelete: Cascade)
+  imageUrl     String
+  isPrimary    Boolean    @default(false) 
+  
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+}
+
+// DOMAIN: TEST DRIVE
+model TestDrive {
+  id           String          @id @default(uuid())
+  userId       String
+  user         User            @relation(fields: [userId], references: [id])
+  motorcycleId String
+  motorcycle   Motorcycle      @relation(fields: [motorcycleId], references: [id])
+  
+  scheduledAt  DateTime        
+  location     String          
+  status       TestDriveStatus @default(PENDING) 
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+}
+
+// DOMAIN: ORDER & PAYMENT
+model Order {
+  id            String      @id @default(uuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id])
+  
+  totalAmount   Decimal     @db.Decimal(15, 2) 
+  status        OrderStatus @default(PENDING)
+
+  // Relations
+  orderItems    OrderItem[]
+  payment       Payment?    
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model OrderItem {
+  id              String     @id @default(uuid())
+  orderId         String
+  order           Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  motorcycleId    String
+  motorcycle      Motorcycle @relation(fields: [motorcycleId], references: [id])
+  
+  quantity        Int        
+  priceAtPurchase Decimal    @db.Decimal(15, 2) 
+}
+
+model Payment { 
+  id            String        @id @default(uuid())
+  orderId       String        @unique
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  method        String        
+  status        PaymentStatus @default(PENDING)
+  transactionId String?       
+
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+// DOMAIN: A.I CHATBOT (RAG CONTEXT)
+model ChatSession {
+  id        String        @id @default(uuid())
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  messages  ChatMessage[] 
+
+  startedAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model ChatMessage {
+  id            String      @id @default(uuid())
+  chatSessionId String
+  chatSession   ChatSession @relation(fields: [chatSessionId], references: [id], onDelete: Cascade)
+  
+  sender        SenderType  
+  content       String      @db.Text
+  
+  sentAt        DateTime    @default(now())
+}

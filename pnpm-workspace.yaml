@@ -1,0 +1,5 @@
+allowBuilds:
+  '@prisma/engines': false
+  prisma: false
+  puppeteer: false
+  unrs-resolver: false
